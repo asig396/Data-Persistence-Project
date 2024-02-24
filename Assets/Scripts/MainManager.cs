@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.IO;
+using TMPro;
+using UnityEngine.SocialPlatforms.Impl;
+using System.Data;
+using System.Drawing;
+
 
 public class MainManager : MonoBehaviour
 {
@@ -12,20 +18,25 @@ public class MainManager : MonoBehaviour
 
     public Text ScoreText;
     public GameObject GameOverText;
-    
+
     private bool m_Started = false;
     private int m_Points;
-    
+
     private bool m_GameOver = false;
 
-    
+    public TMP_Text bestScoreText;
+    [SerializeField] string actualPlayer;
+    [SerializeField] string bestPlayer;
+    [SerializeField] int maxPoints;
+
+
     // Start is called before the first frame update
     void Start()
     {
         const float step = 0.6f;
         int perLine = Mathf.FloorToInt(4.0f / step);
-        
-        int[] pointCountArray = new [] {1,1,2,2,5,5};
+
+        int[] pointCountArray = new[] { 1, 1, 2, 2, 5, 5 };
         for (int i = 0; i < LineCount; ++i)
         {
             for (int x = 0; x < perLine; ++x)
@@ -36,10 +47,13 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+        LoadRecord();
+        bestScoreText.text = "Best Score: " + bestPlayer + " " + maxPoints;
     }
 
     private void Update()
     {
+
         if (!m_Started)
         {
             if (Input.GetKeyDown(KeyCode.Space))
@@ -55,9 +69,14 @@ public class MainManager : MonoBehaviour
         }
         else if (m_GameOver)
         {
+            SaveRecord();
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
+            else if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                SceneManager.LoadScene(0);
             }
         }
     }
@@ -65,12 +84,63 @@ public class MainManager : MonoBehaviour
     void AddPoint(int point)
     {
         m_Points += point;
-        ScoreText.text = $"Score : {m_Points}";
-    }
 
+        if (m_Points > maxPoints)
+        {
+            bestPlayer = actualPlayer;
+            maxPoints = m_Points;
+            bestScoreText.text = "Best Score : " + bestPlayer + " " + maxPoints;
+            ScoreText.text = "Score " + bestPlayer + " : " + maxPoints;
+        }
+        else
+        {
+            bestScoreText.text = "Best Score: " + bestPlayer + " " + maxPoints;
+            ScoreText.text = "Score " + actualPlayer + ": " + m_Points;
+        }
+    }
     public void GameOver()
     {
         m_GameOver = true;
         GameOverText.SetActive(true);
+    }
+
+    [System.Serializable]
+    class SaveData
+    {
+        //[System.Serializable] encima de ella. Esta línea es requerida para JsonUtility
+        public int record;
+        public string name;
+        public string newPlayer;
+    }
+
+    public void SaveRecord()
+    {
+        //rehase una nueva instancia de los datos guardados y rellenaste su miembro de la clase
+        SaveData data = new SaveData();
+        data.newPlayer = actualPlayer;
+        data.name = bestPlayer;
+        data.record = maxPoints;
+        //transformaste esa instancia de JSON con JsonUtility.ToJson
+        string json = JsonUtility.ToJson(data);
+        //usaste el método especial File.WriteAllText para escribir una secuencia de caracteres a un archivo
+        //Usaste un método de Unity llamado Application.persistentDataPath que te dará una carpeta donde podrás guardar datos que sobrevivirán
+        File.WriteAllText(Application.persistentDataPath + "/savefile.json", json);
+    }
+
+    public void LoadRecord()
+    {
+        string path = Application.persistentDataPath + "/savefile.json";
+        //Utiliza el método File.Exists para verificar si existe un archivo .json
+        if (File.Exists(path))
+        {
+            //Si el archivo existe, entonces el método leerá su contenido con File.ReadAllText
+            string json = File.ReadAllText(path);
+            //dará el texto resultante a JsonUtility.FromJson para transformarlo nuevamente en una instancia de SaveData
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+            //Por último, definiremos el TeamColor al color guardado en ese SaveData
+            actualPlayer = data.newPlayer;
+            bestPlayer = data.name;
+            maxPoints = data.record;
+        }
     }
 }
